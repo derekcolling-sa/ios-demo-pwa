@@ -16,6 +16,7 @@ import {
   Vibrate,
   X,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ACCENTS,
   APPEARANCES,
@@ -67,7 +68,7 @@ export function HomeScreen({ onNew, onOpen }: { onNew: () => void; onOpen: (id: 
         <button
           aria-label="New project"
           onClick={onNew}
-          className="flex size-[30px] items-center justify-center rounded-full bg-accent text-white active:opacity-50"
+          className="flex size-[30px] items-center justify-center rounded-full bg-accent text-white transition-transform duration-600 ease-spring active:scale-85"
         >
           <Plus size={20} strokeWidth={2.8} />
         </button>
@@ -94,30 +95,39 @@ export function HomeScreen({ onNew, onOpen }: { onNew: () => void; onOpen: (id: 
           <p className="text-[15px]">Clear week ahead.</p>
         </div>
       ) : (
-        <div className="space-y-2.5 px-4">
-          {dueThisWeek.map((p) => {
-            const meta = STATUS_META[p.status];
-            const Icon = KIND_META[p.kind].icon;
-            return (
-              <button
-                key={p.id}
-                onClick={() => onOpen(p.id)}
-                className="flex w-full items-center gap-3.5 rounded-[14px] bg-cell p-3 text-left transition-opacity active:opacity-60"
-              >
-                <span
-                  className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
-                  style={{ color: meta.color, background: `color-mix(in srgb, ${meta.color} 15%, transparent)` }}
+        <div className="px-4">
+          <AnimatePresence initial={false}>
+            {dueThisWeek.map((p) => {
+              const meta = STATUS_META[p.status];
+              const Icon = KIND_META[p.kind].icon;
+              return (
+                <motion.div
+                  key={p.id}
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ type: "spring", bounce: 0, visualDuration: 0.32 }}
                 >
-                  <Icon size={20} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[17px] font-medium">{p.name}</span>
-                  <span className="block text-[12px] text-label2">{p.client}</span>
-                </span>
-                <span className="shrink-0 text-[12px] font-semibold text-label2">{relativeDue(p.due)}</span>
-              </button>
-            );
-          })}
+                  <button
+                    onClick={() => onOpen(p.id)}
+                    className="mb-2.5 flex w-full items-center gap-3.5 rounded-[14px] bg-cell p-3 text-left transition-[transform,opacity] duration-600 ease-spring active:scale-[0.98] active:opacity-80"
+                  >
+                    <span
+                      className="flex size-10 shrink-0 items-center justify-center rounded-[10px]"
+                      style={{ color: meta.color, background: `color-mix(in srgb, ${meta.color} 15%, transparent)` }}
+                    >
+                      <Icon size={20} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[17px] font-medium">{p.name}</span>
+                      <span className="block text-[12px] text-label2">{p.client}</span>
+                    </span>
+                    <span className="shrink-0 text-[12px] font-semibold text-label2">{relativeDue(p.due)}</span>
+                  </button>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
@@ -131,10 +141,9 @@ export function HomeScreen({ onNew, onOpen }: { onNew: () => void; onOpen: (id: 
                 <button
                   key={p.id}
                   onClick={() => onOpen(p.id)}
-                  className="flex h-[170px] w-[190px] shrink-0 snap-start flex-col rounded-[20px] p-4 text-left text-white transition-transform active:scale-[0.97]"
+                  className="flex h-[170px] w-[190px] shrink-0 snap-start flex-col rounded-[20px] p-4 text-left text-white transition-transform duration-600 ease-spring active:scale-[0.95]"
                   style={{
-                    background:
-                      "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, white))",
+                    background: "linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, white))",
                   }}
                 >
                   <Icon size={26} />
@@ -207,7 +216,7 @@ export function ProjectsScreen({ onOpen }: { onOpen: (id: string) => void }) {
             <button
               key={c.label}
               onClick={() => setFilter(c.value)}
-              className={`shrink-0 rounded-full px-3.5 py-[7px] text-[15px] font-medium transition-colors ${
+              className={`shrink-0 rounded-full px-3.5 py-[7px] text-[15px] font-medium transition-[background-color,color,transform] duration-600 ease-spring active:scale-95 ${
                 on ? "bg-accent text-white" : "bg-fill3 text-label"
               }`}
             >
@@ -223,29 +232,34 @@ export function ProjectsScreen({ onOpen }: { onOpen: (id: string) => void }) {
           <p className="mt-3 text-[22px] font-bold text-label">
             {search ? `No Results for “${search}”` : "No Projects"}
           </p>
-          <p className="mt-1 text-[15px]">{search ? "Check the spelling or try a new search." : "Nothing in this status."}</p>
+          <p className="mt-1 text-[15px]">
+            {search ? "Check the spelling or try a new search." : "Nothing in this status."}
+          </p>
         </div>
       ) : (
         <Section tight footer="Swipe right to star, left to delete.">
-          {visible.map((p) => (
-            <SwipeRow
-              key={p.id}
-              leading={{
-                label: p.starred ? "Unstar" : "Star",
-                icon: p.starred ? <StarOff size={20} /> : <Star size={20} fill="currentColor" />,
-                color: "var(--yellow)",
-                onAction: () => toggleStar(p.id),
-              }}
-              trailing={{
-                label: "Delete",
-                icon: <Trash2 size={20} />,
-                color: "var(--red)",
-                onAction: () => deleteProject(p.id),
-              }}
-            >
-              <ProjectRow project={p} onClick={() => onOpen(p.id)} />
-            </SwipeRow>
-          ))}
+          <AnimatePresence initial={false}>
+            {visible.map((p) => (
+              <SwipeRow
+                key={p.id}
+                leading={{
+                  label: p.starred ? "Unstar" : "Star",
+                  icon: p.starred ? <StarOff size={20} /> : <Star size={20} fill="currentColor" />,
+                  color: "var(--yellow)",
+                  onAction: () => toggleStar(p.id),
+                }}
+                trailing={{
+                  label: "Delete",
+                  icon: <Trash2 size={20} />,
+                  color: "var(--red)",
+                  destructive: true,
+                  onAction: () => deleteProject(p.id),
+                }}
+              >
+                <ProjectRow project={p} onClick={() => onOpen(p.id)} />
+              </SwipeRow>
+            ))}
+          </AnimatePresence>
         </Section>
       )}
     </Screen>
@@ -375,14 +389,28 @@ export function NewProjectForm({ onClose }: { onClose: () => void }) {
         confirmLabel="Add"
         confirmDisabled={!canSave}
         onConfirm={() => {
-          addProject({ name: name.trim(), client: client.trim(), kind, status: "briefing", due, progress: 0, notes, starred });
+          addProject({
+            name: name.trim(),
+            client: client.trim(),
+            kind,
+            status: "briefing",
+            due,
+            progress: 0,
+            notes,
+            starred,
+          });
           onClose();
         }}
       />
       <div className="flex-1 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom)+32px)]">
         <Section header="Basics">
           <Row>
-            <input className={input} placeholder="Project name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className={input}
+              placeholder="Project name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </Row>
           <Row>
             <input className={input} placeholder="Client" value={client} onChange={(e) => setClient(e.target.value)} />
@@ -493,7 +521,7 @@ export function SettingsScreen() {
                 aria-checked={state.accent === a}
                 aria-label={cap(a)}
                 onClick={() => updateSettings({ accent: a })}
-                className="flex size-7 items-center justify-center rounded-full text-white transition-transform active:scale-90"
+                className="flex size-7 items-center justify-center rounded-full text-white transition-transform duration-600 ease-spring active:scale-80"
                 style={{ background: `var(--${a})` }}
               >
                 {state.accent === a && <Check size={15} strokeWidth={3.5} />}
@@ -504,14 +532,28 @@ export function SettingsScreen() {
       </Section>
 
       <Section header="Preferences">
-        <Row icon={<IconTile color="var(--red)"><Bell size={17} fill="currentColor" /></IconTile>} label="Due-date reminders">
+        <Row
+          icon={
+            <IconTile color="var(--red)">
+              <Bell size={17} fill="currentColor" />
+            </IconTile>
+          }
+          label="Due-date reminders"
+        >
           <Toggle
             label="Due-date reminders"
             checked={state.notificationsOn}
             onChange={(notificationsOn) => updateSettings({ notificationsOn })}
           />
         </Row>
-        <Row icon={<IconTile color="var(--purple)"><Vibrate size={17} /></IconTile>} label="Haptics">
+        <Row
+          icon={
+            <IconTile color="var(--purple)">
+              <Vibrate size={17} />
+            </IconTile>
+          }
+          label="Haptics"
+        >
           <Toggle label="Haptics" checked={state.haptics} onChange={(haptics) => updateSettings({ haptics })} />
         </Row>
       </Section>
@@ -528,7 +570,11 @@ export function SettingsScreen() {
       >
         <Row label="Version" detail="1.0 (1)" />
         <Row
-          icon={<IconTile color="var(--blue)"><Smartphone size={17} /></IconTile>}
+          icon={
+            <IconTile color="var(--blue)">
+              <Smartphone size={17} />
+            </IconTile>
+          }
           label="Running as"
           detail={installed ? "Home Screen app" : "Web page"}
         />

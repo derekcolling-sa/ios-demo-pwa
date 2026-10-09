@@ -4,6 +4,10 @@
 
 /* iOS system colors (light) */
 :root {
+  /* Damped springs sampled into linear(). Pair with duration-600 / duration-800. */
+  --spring: linear(0, 0.029, 0.104, 0.209, 0.329, 0.453, 0.575, 0.686, 0.785, 0.869, 0.938, 0.991, 1.031, 1.058, 1.074, 1.082, 1.083, 1.080, 1.072, 1.063, 1.053, 1.043, 1.033, 1.024, 1.016, 1.009, 1.004, 1.000, 0.997, 0.995, 0.994, 0.993, 0.993, 0.994, 0.994, 0.995, 0.996, 0.997, 0.998, 0.998, 1);
+  --spring-soft: linear(0, 0.029, 0.103, 0.201, 0.311, 0.422, 0.528, 0.625, 0.710, 0.783, 0.844, 0.893, 0.931, 0.961, 0.983, 0.998, 1.009, 1.015, 1.019, 1.020, 1.020, 1.018, 1.017, 1.014, 1.012, 1.010, 1.008, 1.006, 1.005, 1.003, 1.002, 1.002, 1.001, 1.000, 1.000, 1.000, 1.000, 1.000, 1.000, 1.000, 1);
+
   --sys-grouped: #f2f2f7;
   --sys-cell: #ffffff;
   --sys-label: #000000;
@@ -75,17 +79,19 @@
   --font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
 
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
-  --animate-push-in: push-in 420ms var(--ease-ios);
   --animate-fade-in: fade-in 300ms ease-out;
 
-  @keyframes push-in {
-    from { transform: translateX(100%); }
-    to { transform: translateX(0); }
-  }
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
   }
+}
+
+@utility ease-spring {
+  transition-timing-function: var(--spring);
+}
+@utility ease-spring-soft {
+  transition-timing-function: var(--spring-soft);
 }
 
 html,

@@ -1,15 +1,25 @@
 "use client";
 
 import {
+  createContext,
+  useContext,
   useEffect,
   useRef,
   useState,
   type CSSProperties,
+  type HTMLAttributes,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { animate, motion, useTransform, type MotionValue, type Transition } from "motion/react";
+
+/** Shared springs. `visualDuration` = time to visually arrive; `bounce` = overshoot. */
+export const PUSH: Transition = { type: "spring", bounce: 0, visualDuration: 0.42 };
+export const SHEET_OPEN: Transition = { type: "spring", bounce: 0.14, visualDuration: 0.5 };
+export const SHEET_CLOSE: Transition = { type: "spring", bounce: 0, visualDuration: 0.36 };
+const ROW: Transition = { type: "spring", bounce: 0, visualDuration: 0.32 };
 
 const TAB_BAR_SPACE = "pb-[calc(49px+env(safe-area-inset-bottom)+32px)]";
 
@@ -51,9 +61,7 @@ export function Screen({
           <div className="z-10 flex items-center gap-4">{trailing}</div>
         </div>
       </header>
-      {large && (
-        <h1 className="px-4 pb-2 pt-0.5 text-[34px] font-bold leading-[41px] tracking-[0.37px]">{title}</h1>
-      )}
+      {large && <h1 className="px-4 pb-2 pt-0.5 text-[34px] font-bold leading-[41px] tracking-[0.37px]">{title}</h1>}
       {children}
     </div>
   );
@@ -134,7 +142,10 @@ export function Row({
 /** Colored rounded-square icon used in Settings rows. */
 export function IconTile({ color, children }: { color: string; children: ReactNode }) {
   return (
-    <span className="flex size-[29px] items-center justify-center rounded-[7px] text-white" style={{ background: color }}>
+    <span
+      className="flex size-[29px] items-center justify-center rounded-[7px] text-white"
+      style={{ background: color }}
+    >
       {children}
     </span>
   );
@@ -160,7 +171,7 @@ export function Toggle({
       }`}
     >
       <span
-        className={`absolute left-[2px] top-[2px] size-[27px] rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.15),0_3px_1px_rgba(0,0,0,0.06)] transition-transform duration-300 ease-ios ${
+        className={`absolute left-[2px] top-[2px] size-[27px] rounded-full bg-white shadow-[0_3px_8px_rgba(0,0,0,0.15),0_3px_1px_rgba(0,0,0,0.06)] transition-transform duration-600 ease-spring ${
           checked ? "translate-x-[20px]" : ""
         }`}
       />
@@ -179,7 +190,10 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
   label: string;
 }) {
-  const index = Math.max(0, options.findIndex((o) => o.value === value));
+  const index = Math.max(
+    0,
+    options.findIndex((o) => o.value === value),
+  );
   return (
     <div
       role="radiogroup"
@@ -189,7 +203,7 @@ export function Segmented<T extends string>({
     >
       <span
         aria-hidden
-        className="absolute bottom-[2px] left-[2px] top-[2px] rounded-[7px] bg-segment shadow-[0_3px_8px_rgba(0,0,0,0.12),0_3px_1px_rgba(0,0,0,0.04)] transition-transform duration-300 ease-ios"
+        className="absolute bottom-[2px] left-[2px] top-[2px] rounded-[7px] bg-segment shadow-[0_3px_8px_rgba(0,0,0,0.12),0_3px_1px_rgba(0,0,0,0.04)] transition-transform duration-800 ease-spring-soft"
         style={{
           width: `calc((100% - 4px) / ${options.length})`,
           transform: `translateX(${index * 100}%)`,
@@ -212,15 +226,7 @@ export function Segmented<T extends string>({
   );
 }
 
-export function Slider({
-  value,
-  onChange,
-  label,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  label: string;
-}) {
+export function Slider({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) {
   return (
     <input
       type="range"
@@ -278,27 +284,89 @@ function OverlayPortal({ children }: { children: ReactNode }) {
   return target ? createPortal(children, target) : null;
 }
 
-/** Card-style modal sheet that slides up from the bottom. */
-export function Sheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
-  const { mounted, visible } = usePresence(open, 450);
-  if (!mounted) return null;
+type SheetDrag = Pick<
+  HTMLAttributes<HTMLDivElement>,
+  "onPointerDown" | "onPointerMove" | "onPointerUp" | "onPointerCancel" | "onClickCapture"
+>;
+const SheetDragContext = createContext<SheetDrag>({});
+
+/**
+ * Card-style modal sheet driven by `progress` (0 closed → 1 open).
+ * The grabber and SheetHeader are drag handles: pull down to dismiss, flick to throw it away.
+ */
+export function Sheet({
+  open,
+  progress,
+  onRequestClose,
+  children,
+}: {
+  open: boolean;
+  progress: MotionValue<number>;
+  onRequestClose: (velocity: number) => void;
+  children: ReactNode;
+}) {
+  const y = useTransform(progress, (p) => `${(1 - Math.min(p, 1.04)) * 100}%`);
+  const dim = useTransform(progress, [0, 1], [0, 0.4]);
+  const panel = useRef<HTMLDivElement>(null);
+  const drag = useRef({ y: 0, height: 1, active: false, dragged: false });
+
+  const handlers: SheetDrag = {
+    onPointerDown: (e) => {
+      drag.current = {
+        y: e.clientY,
+        height: panel.current?.getBoundingClientRect().height ?? 1,
+        active: true,
+        dragged: false,
+      };
+    },
+    onPointerMove: (e) => {
+      const d = drag.current;
+      if (!d.active) return;
+      const dy = e.clientY - d.y;
+      if (!d.dragged) {
+        if (Math.abs(dy) < 4) return;
+        d.dragged = true;
+        progress.stop();
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      // Free movement downward, heavy resistance upward.
+      progress.set(dy >= 0 ? 1 - dy / d.height : 1 + (-dy * 0.15) / d.height);
+    },
+    onPointerUp: () => {
+      const d = drag.current;
+      d.active = false;
+      if (!d.dragged) return;
+      const velocity = progress.getVelocity();
+      if (progress.get() < 0.75 || velocity < -1.2) onRequestClose(velocity);
+      else animate(progress, 1, { ...SHEET_OPEN, velocity });
+    },
+    onClickCapture: (e) => {
+      // A drag that started on Cancel/Add shouldn't count as a tap.
+      if (drag.current.dragged) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
+  };
+  handlers.onPointerCancel = handlers.onPointerUp;
+
+  if (!open) return null;
   return (
     <OverlayPortal>
       <div className="absolute inset-0 z-40">
-        <div
-          className={`absolute inset-0 bg-black/40 transition-opacity duration-500 ${visible ? "opacity-100" : "opacity-0"}`}
-          onClick={onClose}
-        />
-        <div
+        <motion.div className="absolute inset-0 bg-black" style={{ opacity: dim }} onClick={() => onRequestClose(0)} />
+        <motion.div
+          ref={panel}
           role="dialog"
           aria-modal="true"
-          className={`absolute inset-x-0 bottom-0 top-[calc(env(safe-area-inset-top)+4%+12px)] flex flex-col overflow-hidden rounded-t-[12px] bg-grouped transition-transform duration-500 ease-ios ${
-            visible ? "translate-y-0" : "translate-y-full"
-          }`}
+          style={{ y }}
+          className="absolute inset-x-0 -bottom-10 top-[calc(env(safe-area-inset-top)+4%+12px)] flex flex-col overflow-hidden rounded-t-[12px] bg-grouped pb-10"
         >
-          <div className="mx-auto mt-[5px] h-[5px] w-9 shrink-0 rounded-full bg-label3" />
-          {children}
-        </div>
+          <div className="shrink-0 touch-none pt-[5px]" {...handlers}>
+            <div className="mx-auto h-[5px] w-9 rounded-full bg-label3" />
+          </div>
+          <SheetDragContext.Provider value={handlers}>{children}</SheetDragContext.Provider>
+        </motion.div>
       </div>
     </OverlayPortal>
   );
@@ -317,8 +385,9 @@ export function SheetHeader({
   confirmLabel: string;
   confirmDisabled?: boolean;
 }) {
+  const drag = useContext(SheetDragContext);
   return (
-    <div className="relative flex h-[50px] shrink-0 items-center justify-between px-4">
+    <div className="relative flex h-[50px] shrink-0 touch-none items-center justify-between px-4" {...drag}>
       <button onClick={onCancel} className="text-[17px] text-accent active:opacity-40">
         Cancel
       </button>
@@ -360,7 +429,7 @@ export function ActionSheet({
         <div
           role="alertdialog"
           aria-label={title}
-          className={`absolute inset-x-2 bottom-[max(8px,env(safe-area-inset-bottom))] space-y-2 transition-transform duration-400 ease-ios ${
+          className={`absolute inset-x-2 bottom-[max(8px,env(safe-area-inset-bottom))] space-y-2 transition-transform duration-800 ease-spring-soft ${
             visible ? "translate-y-0" : "translate-y-[calc(100%+40px)]"
           }`}
         >
@@ -390,7 +459,14 @@ export function ActionSheet({
 
 // ---------- gestures ----------
 
-type SwipeAction = { label: string; icon: ReactNode; color: string; onAction: () => void };
+type SwipeAction = {
+  label: string;
+  icon: ReactNode;
+  color: string;
+  onAction: () => void;
+  /** Leave the row open so it collapses with the button (delete). */
+  destructive?: boolean;
+};
 
 const ACTION_WIDTH = 78;
 
@@ -454,12 +530,19 @@ export function SwipeRow({
   };
 
   const run = (a: SwipeAction) => {
-    setOffset(0);
+    if (!a.destructive) setOffset(0);
     a.onAction();
   };
 
   return (
-    <div className="group/cell relative overflow-hidden">
+    // Used inside <AnimatePresence>: rows grow in when added and fold shut when removed.
+    <motion.div
+      className="group/cell relative overflow-hidden"
+      initial={{ height: 0, opacity: 0 }}
+      animate={{ height: "auto", opacity: 1 }}
+      exit={{ height: 0, opacity: 0 }}
+      transition={ROW}
+    >
       {leading && (
         <button
           aria-label={leading.label}
@@ -501,63 +584,58 @@ export function SwipeRow({
       >
         {children}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-/** A pushed navigation layer: slides in from the right, supports edge-swipe back. */
+/**
+ * A pushed navigation layer that follows `progress` (0 on screen → 1 off to the right).
+ * Drag from the left edge to go back; release past a third, or flick, to pop.
+ */
 export function PushedLayer({
-  leaving,
-  onSwipeBack,
+  progress,
+  onPop,
+  onSettle,
   children,
 }: {
-  leaving: boolean;
-  onSwipeBack: () => void;
+  progress: MotionValue<number>;
+  onPop: (velocity: number) => void;
+  onSettle: (velocity: number) => void;
   children: ReactNode;
 }) {
-  const [dragX, setDragXState] = useState<number | null>(null);
-  const start = useRef<number | null>(null);
-  const live = useRef(0);
-  const setDragX = (v: number | null) => {
-    live.current = v ?? 0;
-    setDragXState(v);
-  };
-
-  const style: CSSProperties = leaving
-    ? { transform: "translateX(100%)", transition: "transform 350ms var(--ease-ios)" }
-    : dragX !== null
-      ? { transform: `translateX(${dragX}px)`, transition: "none" }
-      : { transform: "translateX(0)", transition: "transform 350ms var(--ease-ios)" };
+  const x = useTransform(progress, (p) => `${p * 100}%`);
+  const shadow = useTransform(progress, (p) => `-10px 0 30px rgba(0,0,0,${0.14 * (1 - p)})`);
+  const drag = useRef<{ x: number; width: number } | null>(null);
 
   return (
-    <div
-      className="absolute inset-0 z-10 animate-push-in shadow-[-10px_0_30px_rgba(0,0,0,0.12)]"
-      style={{ ...style, touchAction: "pan-y" }}
+    <motion.div
+      className="absolute inset-0 z-10"
+      style={{ x, boxShadow: shadow, touchAction: "pan-y" }}
       onPointerDown={(e) => {
-        const left = e.currentTarget.getBoundingClientRect().left;
-        if (e.clientX - left <= 24) {
-          start.current = e.clientX;
-          e.currentTarget.setPointerCapture(e.pointerId);
-        }
+        const rect = e.currentTarget.getBoundingClientRect();
+        if (e.clientX - rect.left > 24) return;
+        progress.stop();
+        drag.current = { x: e.clientX, width: rect.width };
+        e.currentTarget.setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
-        if (start.current === null) return;
-        setDragX(Math.max(0, e.clientX - start.current));
+        if (!drag.current) return;
+        progress.set(Math.min(1, Math.max(0, (e.clientX - drag.current.x) / drag.current.width)));
       }}
-      onPointerUp={(e) => {
-        if (start.current === null) return;
-        const width = e.currentTarget.getBoundingClientRect().width;
-        const dx = live.current;
-        start.current = null;
-        setDragX(null);
-        if (dx > width * 0.33) onSwipeBack();
+      onPointerUp={() => {
+        if (!drag.current) return;
+        drag.current = null;
+        const velocity = progress.getVelocity();
+        if (progress.get() > 0.35 || velocity > 1.2) onPop(velocity);
+        else onSettle(velocity);
       }}
       onPointerCancel={() => {
-        start.current = null;
-        setDragX(null);
+        if (!drag.current) return;
+        drag.current = null;
+        onSettle(0);
       }}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }
