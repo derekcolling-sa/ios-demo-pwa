@@ -1,26 +1,171 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* iOS system colors (light) */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --sys-grouped: #f2f2f7;
+  --sys-cell: #ffffff;
+  --sys-label: #000000;
+  --sys-label2: rgba(60, 60, 67, 0.6);
+  --sys-label3: rgba(60, 60, 67, 0.3);
+  --sys-sep: rgba(60, 60, 67, 0.29);
+  --sys-fill: rgba(120, 120, 128, 0.2);
+  --sys-fill3: rgba(118, 118, 128, 0.12);
+  --sys-bar: rgba(249, 249, 249, 0.82);
+  --sys-segment: #ffffff;
+
+  --blue: #007aff;
+  --green: #34c759;
+  --orange: #ff9500;
+  --red: #ff3b30;
+  --yellow: #ffcc00;
+  --gray: #8e8e93;
+  --indigo: #5856d6;
+  --teal: #30b0c7;
+  --pink: #ff2d55;
+  --purple: #af52de;
+
+  --accent: var(--indigo);
+  color-scheme: light;
+}
+
+/* iOS system colors (dark) */
+.dark {
+  --sys-grouped: #000000;
+  --sys-cell: #1c1c1e;
+  --sys-label: #ffffff;
+  --sys-label2: rgba(235, 235, 245, 0.6);
+  --sys-label3: rgba(235, 235, 245, 0.3);
+  --sys-sep: rgba(84, 84, 88, 0.65);
+  --sys-fill: rgba(120, 120, 128, 0.36);
+  --sys-fill3: rgba(118, 118, 128, 0.24);
+  --sys-bar: rgba(22, 22, 22, 0.82);
+  --sys-segment: #636366;
+
+  --blue: #0a84ff;
+  --green: #30d158;
+  --orange: #ff9f0a;
+  --red: #ff453a;
+  --yellow: #ffd60a;
+  --gray: #8e8e93;
+  --indigo: #5e5ce6;
+  --teal: #40c8e0;
+  --pink: #ff375f;
+  --purple: #bf5af2;
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-grouped: var(--sys-grouped);
+  --color-cell: var(--sys-cell);
+  --color-label: var(--sys-label);
+  --color-label2: var(--sys-label2);
+  --color-label3: var(--sys-label3);
+  --color-sep: var(--sys-sep);
+  --color-fill: var(--sys-fill);
+  --color-fill3: var(--sys-fill3);
+  --color-segment: var(--sys-segment);
+  --color-accent: var(--accent);
+  --color-ios-green: var(--green);
+  --color-ios-red: var(--red);
+  --color-ios-yellow: var(--yellow);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+  --font-rounded: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
+
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-push-in: push-in 420ms var(--ease-ios);
+  --animate-fade-in: fade-in 300ms ease-out;
+
+  @keyframes push-in {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--sys-label);
+  background: #d1d1d6;
+  letter-spacing: -0.41px;
+}
+.dark body {
+  background: #111113;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Translucent bar material (nav bar, tab bar) */
+.material {
+  background: var(--sys-bar);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* iOS-style slider */
+.ios-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+}
+.ios-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--p), var(--sys-fill) var(--p));
+}
+.ios-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--accent) var(--p), var(--sys-fill) var(--p));
+}
+.ios-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  margin-top: -12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.12), 0 6px 13px rgba(0, 0, 0, 0.12);
+}
+.ios-slider::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0.5px 4px rgba(0, 0, 0, 0.12), 0 6px 13px rgba(0, 0, 0, 0.12);
+}
+
+/* Compact date picker pill */
+.ios-date {
+  background: var(--sys-fill3);
+  border-radius: 6px;
+  padding: 6px 11px;
+  font-size: 17px;
+  color: var(--accent);
+  min-height: 34px;
 }
